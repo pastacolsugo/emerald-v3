@@ -34,8 +34,8 @@
                 "/Users/sugo/.platformio/packages/framework-arduinoavr/libraries/Temboo/src",
                 "/Users/sugo/.platformio/packages/framework-arduinoavr/libraries/WiFi/src",
                 "/Users/sugo/.platformio/packages/tool-unity",
-                "/Users/sugo/git/emerald-v3/Emerald-v3/include",
-                "/Users/sugo/git/emerald-v3/Emerald-v3/src",
+                "/Users/sugo/git/emerald-v3/Emerald-v3-platformio/include",
+                "/Users/sugo/git/emerald-v3/Emerald-v3-platformio/src",
                 ""
             ],
             "browse": {
@@ -71,8 +71,8 @@
                     "/Users/sugo/.platformio/packages/framework-arduinoavr/libraries/Temboo/src",
                     "/Users/sugo/.platformio/packages/framework-arduinoavr/libraries/WiFi/src",
                     "/Users/sugo/.platformio/packages/tool-unity",
-                    "/Users/sugo/git/emerald-v3/Emerald-v3/include",
-                    "/Users/sugo/git/emerald-v3/Emerald-v3/src",
+                    "/Users/sugo/git/emerald-v3/Emerald-v3-platformio/include",
+                    "/Users/sugo/git/emerald-v3/Emerald-v3-platformio/src",
                     ""
                 ]
             },
