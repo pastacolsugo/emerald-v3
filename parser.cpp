@@ -47,21 +47,19 @@ std::string parseParameter (std::string::iterator userInputIterator,
 
 	std::string result;
 
-	// std::cout << "parsing parameter:\n";
-
-	for (; userInputIterator != userInputEndIterator; userInputIterator++) {
-		// std::cout << *userInputIterator;
+	for (; userInputIterator != userInputEndIterator; userInputIterator++) {	
+		// iterate through all user input charachters (needed because parameter may end the string)
 
 		if (*userInputIterator == *parameterEndCharIterator){
-			// std::cout << "param End - " << result << '\n';
+			// if the parameter end char is found, stop copying and return
 			return result;
 		}
 
-
+		// add the character from the command to the parameter string
 		result.push_back (*userInputIterator);
 	}
 
-	std::cout << '\n';
+	// command ending with parameter case
 	return result;
 }
 
