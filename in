@@ -1,0 +1,18 @@
+time set a/b/c d:e:f
+light set a:b c d:e
+water set a:b ccc
+water repeat a
+temperature set a b
+time get
+light get
+water get
+temperature get
+time set 1/2/3 4:5:6
+light set 1:2 3 4:5
+water set 1:2 333
+water repeat 1
+temperature set 1 2
+time get
+light get
+water get
+temperature get
