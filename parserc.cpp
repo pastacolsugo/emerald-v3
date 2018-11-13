@@ -2,38 +2,89 @@
 #include <stdlib.h>
 
 #define wildcard '$'
-// using '$' wildcard;
 
-// struct Command {
-// 	std::string command;
-// 	std::vector <std::string> paramList;
-// 	bool success;
 
-// 	Command () : success(false) {};
-// };
+struct CommandStruct {
+	int commandIndex;
+	int paramNumber;
+	char ** paramList;
+	bool success;	
+};
 
+typedef struct CommandStruct Command;
+
+char ** commandTable;
+uint8_t commandNumber = 0;
 // std::vector <std::string> commandTable;
 
-// void commandTableINIT () {
-// 	commandTable.push_back ("time set $/$/$ $:$:$");
-// 	commandTable.push_back ("time get");
+bool commandTableINIT () {
+	// command string length for auto malloc
+	// terminator char excluded
+	int sizes[] = { 20, 8, 19, 9, 15, 14, 9, 19, 15 };
+	commandNumber = 9;
 
-// 	commandTable.push_back ("light set $:$ $ $:$");
-// 	commandTable.push_back ("light get");
+	// // test commands sizes
+	// int sizes[] = { 8, 11, 13, 17, 18, 20, 21, 25 };
+	// commandNumber = 8;
 
-// 	commandTable.push_back ("water set $:$ $");
-// 	commandTable.push_back ("water repeat $");
-// 	commandTable.push_back ("water get");
+	commandTable = (char **) malloc (sizeof(char*) * commandNumber);
 
-// 	commandTable.push_back ("temperature set $ $");
-// 	commandTable.push_back ("temperature get");
-// }
+	if (!commandTable) {
+		return false;
+	} 
 
-char * parseParameter ( char * userInputPointer, 
-						char * userInputEndPointer,
-						char * parameterEndCharPointer) {
+	// allocate space for every string
+	for (int i=0; i<commandNumber; i++) {
+		commandTable[i] = (char *) malloc (sizeof(char) * (sizes[i]+1));
+		// allocate string length + 1 char for terminator
 
-	char * result = (char *) malloc (sizeof(char) * 16); // max 15 chars + terminator
+		if (!commandTable[i]) {
+			// allocation error
+
+			// deallocate the previously allocated strings
+			for (int j=i-1; j>=0; j--) {
+				free (commandTable[i]);
+			}
+
+			// free the first pointer
+			free (commandTable);
+			return false;
+		}
+	}
+
+	// // test commands
+	// commandTable[0] = "no param\0";
+	// commandTable[1] = "one param $\0";
+	// commandTable[2] = "two param $ $\0";
+	// commandTable[3] = "three param $ $ $\0";
+	// commandTable[4] = "four param $ $ $ $\0";
+	// commandTable[5] = "five param $ $ $ $ $\0";
+	// commandTable[6] = "six param $ $ $ $ $ $\0";
+	// commandTable[7] = "seven param $ $ $ $ $ $ $\0";
+
+
+	commandTable[0] = "time set $/$/$ $:$:$\0";
+	commandTable[1] = "time get\0";
+
+	commandTable[2] = "light set $:$ $ $:$\0";
+	commandTable[3] = "light get\0";
+
+	commandTable[4] = "water set $:$ $\0";
+	commandTable[5] = "water repeat $\0";
+	commandTable[6] = "water get\0";
+
+	commandTable[7] = "temperature set $ $\0";
+	commandTable[8] = "temperature get\0";
+
+	return true;
+}
+
+char * parseParameter (char * userInputPointer, char * parameterEndCharPointer) {
+
+	int paramSize = 8;
+	// max 7 chars + terminator
+
+	char * result = (char *) malloc (sizeof(char) * paramSize);
 
 	if (!result) { // allocation error
 		return NULL;
@@ -41,7 +92,7 @@ char * parseParameter ( char * userInputPointer,
 
 	int i = 0; // will contain the parameter size
 
-	for (i=0; userInputPointer != userInputEndPointer && i<15; userInputPointer++, i++) {
+	for (i=0; *userInputPointer != 0 && i<paramSize-1; userInputPointer++, i++) {
 		// iterate through all user input charachters (needed because parameter may end the string)
 
 		if (*userInputPointer == *parameterEndCharPointer) {
@@ -52,130 +103,181 @@ char * parseParameter ( char * userInputPointer,
 		result[i] = *userInputPointer;
 	}
 
-	result = (char *) realloc (result, sizeof(char) * (i+1));
+	char * newBlock = (char *) realloc (result, sizeof(char) * (i+1));
 	// in every case i == result size
 	// i + 1 because we need the terminator char
 
-	if (!result) {
+	if (!newBlock) {
 		// bad reallocation
+		free (result);
 		return NULL;
 	}
+
+	result = newBlock;
 
 	result[i] = 0;
 
 	return result;
 }
 
-// std::string parseParameter (std::string::iterator userInputIterator,
-// 							std::string::iterator userInputEndIterator,
-// 							std::string::iterator parameterEndCharIterator) {
+Command * parse (char * userInput) {
+	bool paramFound = false;
 
-// 	std::string result;
+	Command * result = (Command *) malloc (sizeof(Command));
 
-// 	for (; userInputIterator != userInputEndIterator; userInputIterator++) {	
-// 		// iterate through all user input charachters (needed because parameter may end the string)
+	if (!result) {
+		return NULL;
+	}
 
-// 		if (*userInputIterator == *parameterEndCharIterator){
-// 			// if the parameter end char is found, stop copying and return
-// 			return result;
-// 		}
+	result->commandIndex = -1;
+	result->paramNumber = 0;
+	result->paramList = NULL;
+	result->success = false;
 
-// 		// add the character from the command to the parameter string
-// 		result.push_back (*userInputIterator);
-// 	}
+	// iterate through reference commands
+	for (int i=0; i<commandNumber; i++) {
+		// printf (">> testing \"%s\"\n", commandTable[i]);
 
-// 	// command ending with parameter case
-// 	return result;
-// }
+		// iterate through the user input
+		for (char *userCharPointer = userInput, *referenceCharPointer = commandTable[i];
+				true;
+				userCharPointer++, referenceCharPointer++) {
 
-// Command parse (std::string userInput) {
-// 	bool paramFound = false;
+			// successful match
+			if (*userCharPointer == 0 && *referenceCharPointer == 0) {
+				result->success = true;
+				result->commandIndex = i;
+				return result;
+			}
 
-// 	Command result;
+			// unsuccessful match
+			// one ends before the other
+			if (*userCharPointer == 0 || *referenceCharPointer == 0) {
+				break;
+			}
 
-// 	for (std::vector<std::string>::iterator commandPrototypeIterator = commandTable.begin();
-// 		commandPrototypeIterator != commandTable.end();
-// 		commandPrototypeIterator++) {
+			if (*referenceCharPointer == wildcard) {
 
-// 		for (std::string::iterator userChar = userInput.begin(), referenceChar = commandPrototypeIterator->begin();	
-// 				true;
-// 				userChar++, referenceChar++) {
+				// parameter found, parse it
+				char * parameter = parseParameter (userCharPointer, referenceCharPointer+1);
+
+				// if parsed successfully
+				if (!parameter) {
+					return NULL;
+				}
+
+				// calculate the parameter length
+				int size = 0;
+				for (size=0; parameter[size] != 0; size++) {}
+
+				// shift pointer forward
+				// magic number -1 accounts for the 'for' incrementation 
+				// can't shift if the parameter length is zero, I would loop forever
+				if (size != 0) {
+					userCharPointer += size - 1;
+				}
+
+				if (result->paramNumber == 0) {
+					// if there is no param list allocated
+					// allocate it
+					result->paramList = (char **) malloc (sizeof(char*));
+
+					if (!result->paramList) {
+						// bad allocation
+						for (int i=0; i<result->paramNumber; i++) {
+							free (result->paramList[i]);	
+						}
+
+						free (result->paramList);
+						free (result);
+
+						return NULL;
+					}
+
+				} else {
+
+					// reallocate parameters+1 for the new one
+					char ** newParamList = (char **) realloc (result->paramList, sizeof(char*) * result->paramNumber+1);
+
+					// deallocate struct
+					if (!newParamList) {
+						for (int i=0; i<result->paramNumber; i++) {
+							free (result->paramList[i]);	
+						}
+
+						free (result->paramList);
+						free (result);
+
+						return NULL;
+					}
+
+					result->paramList = newParamList;
+				}
+
+				// reallocation successful
+				// increase parameter count
+				result->paramNumber += 1;
+
+				result->paramList [result->paramNumber-1] = parameter;
+
+			} else if (*userCharPointer != *referenceCharPointer) {
+				// difference found
+				break;
+			}
+		}	
+	}
 
 
-// 			if ( userChar == userInput.end() && referenceChar == commandPrototypeIterator->end() ) {
-// 				// successful match
-// 				result.success = true;
-// 				result.command = *commandPrototypeIterator;
-// 				return result;
-// 			}	
 
-// 			if (userChar == userInput.end()) {
-// 				// unsuccessful match
-// 				// one ends before the other
+	// free memory
+	for (int i=0; i<result->paramNumber; i++) {
+		free (result->paramList[i]);	
+	}
 
-// 				break;
-// 			}
+	free (result->paramList);
+	free (result);
 
-// 			if (referenceChar == commandPrototypeIterator->end()) {
-// 				break;
-// 			}
+	return NULL;
 
-// 			if (*referenceChar == wildcard) {	
-// 				std::string parameter = parseParameter (userChar, userInput.end(), std::next(referenceChar, 1));	
-
-// 				userChar += parameter.size()-1;
-// 				// -1 -> accounts for the 'for' incrementation
-
-// 				if (parameter.empty()) {
-// 					result.success = false;
-// 					return result;
-// 				}
-
-// 				result.paramList.push_back (parameter);
-
-// 			} else if (*userChar != *referenceChar) {
-// 				// difference found
-// 				break;
-// 			}
-// 		}
-// 	}
-
-// 	return result;
-// }
-
-
-int main () {
-	char input[] = "superca";
-	char endChar = 'f';
-
-	char * parsedParameterPointer = parseParameter (input, input+7, &endChar);
-
-	printf ("%s\n", parsedParameterPointer);
-
-	free (parsedParameterPointer);
-
-	return 0;
+	// return result;
 }
 
-// int main () {
-// 	std::string buffer; 
-// 	commandTableINIT();
+int main () {
+	char input[64];
 
-// 	for (;;) {
-// 		std::getline (std::cin, buffer);
+	commandTableINIT();
 
-// 		Command command = parse (buffer);
-// 		// execute (command);
+	while (fgets (input, 64, stdin)) {	
 
-// 		std::cout << command.success << std::endl;
+		for (int i=0; input[i]!=0; i++) {
+			if (input[i] == '\n' && input[i+1] == 0) {
+				input[i] = 0;
+			}
+		}
 
-// 		std::cout << ">> " << command.command << '\n';
+		printf ("got from console:%s.\n", input);
 
-// 		for (int i=0; i<command.paramList.size(); i++) {
-// 			std::cout << ">> " << command.paramList[i] << '\n';
-// 		}
+		Command * command = parse (input);
 
-// 		std::cout << "---------------------------------\n";
+		if (!command) {
+			printf ("NULL\n");
+			continue;
+		}
 
-// 	}
-// }
+		printf ("Parsed command: %d\n- %d [commandIndex = %s]\n", command->success, command->commandIndex, commandTable [command->commandIndex]);
+		printf ("- %d [paramNumber]\n", command->paramNumber);
+
+		for (int i=0; i<command->paramNumber; i++) {
+			printf ("> %s\n", command->paramList[i]);
+		}
+
+		// for (int i=0; i<command->paramNumber; i++) {
+		// 	free (command->paramList[i]);	
+		// }
+
+		// free (command->paramList);
+		// free (command);
+
+		printf ("---------\n");
+	}
+}
