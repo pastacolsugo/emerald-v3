@@ -15,6 +15,17 @@ struct CommandStruct {
 };
 typedef struct CommandStruct Command;
 
+struct HourMinuteSecond_Struct {
+	uint8_t hour, minute, second;
+};
+typedef struct HourMinuteSecond_Struct HourMinuteSecond;
+
+struct LightProgram_Struct {
+	HourMinuteSecond turnOnTime;
+	HourMinuteSecond turnOffTime;
+};
+typedef struct LightProgram_Struct LightProgram;
+
 #define statLedPin 3 //blinking led indicating loop running
 #define fanLowPower 90
 #define fanHighPower 255
@@ -30,10 +41,7 @@ Timer timer;
 DS3231 rtc (A4, A5);
 Time rtcTime;
 
-int l_OnH = 18;
-int l_OnM = 00;
-int l_OffH = 10;
-int l_OffM = 00;
+LightProgram lightSchedule;
 
 void setup() {
 	Serial.begin (9600); // 38400 ?
@@ -44,11 +52,12 @@ void setup() {
 
 	commandTableINIT();
 
+	lightScheduleINIT();
+
 	pinMode (lightPin, OUTPUT);
 	pinMode (statLedPin, OUTPUT);
 	
 	digitalWrite (lightPin, EEPROM.read (EE_light_addigitalRead) );
-
 }
 
 void loop() {
@@ -127,7 +136,7 @@ void loop() {
 
 	digitalWrite (statLedPin, timer.Clock());	
 
-	lights_Core (l_OnH,l_OnM,l_OffH,l_OffM);
+	// lights_Core (l_OnH,l_OnM,l_OffH,l_OffM);
 }
 
 bool timeSet (char **parameterList, int parameterNumber) {
@@ -152,11 +161,121 @@ void timeGet () {
 }
 
 bool lightSet (char ** parameterList, int parameterNumber) {
+	if (parameterNumber != 5) {
+		return false;
+	}
+
+	HourMinuteSecond turnOnTime, turnOffTime;
+
+	char *untilString = "until\0";
+	char *forString = "for\0";
+
+	turnOnTime.hour = strToInt (parameterList[0]);
+	turnOnTime.minute = strToInt (parameterList[1]);
+
+	turnOffTime.hour = strToInt (parameterList[3]);
+	turnOffTime.minute = strToInt (parameterList[4]);
+
+	if (!isValidHourMinuteSecond (turnOnTime) || !isValidHourMinuteSecond (turnOffTime)) {
+		return false;
+	}
+
+
+	if (strMatch (parameterList[2], forString)) {
+		turnOffTime.hour = (((turnOnTime.hour + turnOffTime.hour) % 24) + ((turnOnTime.minute + turnOffTime.minute) / 60)) % 24;
+		turnOffTime.minute = (turnOnTime.minute + turnOffTime.minute) % 60;
+
+	} else if (!(strMatch (parameterList[2], untilString))) {
+		// if doesn't match either
+		return false;
+	}
+
+	lightSet (turnOnTime, turnOffTime);
+
+	return true;
+}
+
+bool lightSet (HourMinuteSecond turnOnTime, HourMinuteSecond turnOffTime) {
+
+	if (isValidHourMinuteSecond (turnOnTime) && isValidHourMinuteSecond (turnOffTime)) {
+		lightSchedule.turnOnTime = turnOnTime;
+		lightSchedule.turnOffTime = turnOffTime;
+		return true;
+	}
+
 	return false;
 }
 
+bool strMatch (char *a, char *b) {
+	while (*a != 0 && *b != 0 && *a == *b) {
+		a++;
+		b++;
+	}
+
+	if (*a == *b) {
+		return true;
+	}
+	return false;
+}
+
+bool isValidHourMinuteSecond (HourMinuteSecond time) {	
+	if (time.hour < 0 || time.hour >= 24) {
+		return false;
+	}
+
+	if (time.minute < 0 || time.minute >= 60) {
+		return false;
+	}
+
+	if (time.second < 0 || time.second >= 60) {
+		return false;
+	}
+
+	return true;
+}
+
+uint8_t strToInt (char *s) {
+	if (!s) {
+		return 0;
+	}
+
+	uint8_t res = 0;
+
+	while (*s != 0) {
+		if (*s < '0' || *s > '9') {
+			return res;
+		}
+
+		res *= 10;
+		res += (*s) - '0';
+
+		s++;	
+	}
+
+	return res;
+}
+
 void lightGet () {
-	Serial.println ("Hello Sir");
+	Serial.print ("Light program: ON @ ");
+	Serial.print (lightSchedule.turnOnTime.hour);
+	Serial.print (" ");
+	Serial.print (lightSchedule.turnOnTime.minute);
+	Serial.print (" - OFF @ ");
+	Serial.print (lightSchedule.turnOffTime.hour);
+	Serial.print (" ");
+	Serial.println (lightSchedule.turnOffTime.minute);
+}
+
+void lightScheduleINIT () {
+	// now sets arbitrary values
+	// final version will read data from memory
+	lightSchedule.turnOnTime.hour = 18;
+	lightSchedule.turnOnTime.minute = 0;
+	lightSchedule.turnOnTime.second = 0;
+
+	lightSchedule.turnOffTime.hour = 10;
+	lightSchedule.turnOffTime.minute = 0;
+	lightSchedule.turnOffTime.second = 0;
 }
 
 void lights_Core (int OnHour, int OnMinute, int OffHour, int OffMinute) {
@@ -313,7 +432,6 @@ Command * parse (char * userInput) {
 
 	// iterate through reference commands
 	for (int i=0; i<commandNumber; i++) {
-		// printf (">> testing \"%s\"\n", commandTable[i]);
 
 		// iterate through the user input
 		for (char *userCharPointer = userInput, *referenceCharPointer = commandTable[i];
