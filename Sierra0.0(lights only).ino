@@ -11,7 +11,7 @@ struct CommandStruct {
 	int commandIndex;
 	int paramNumber;
 	char **paramList;
-	bool success;	
+	bool success;
 };
 typedef struct CommandStruct Command;
 
@@ -19,6 +19,11 @@ struct HourMinuteSecond_Struct {
 	uint8_t hour, minute, second;
 };
 typedef struct HourMinuteSecond_Struct HourMinuteSecond;
+
+struct DayMonthYear_Struct {
+	uint8_t day, month, year;
+};
+typedef struct DayMonthYear_Struct DayMonthYear;
 
 struct LightProgram_Struct {
 	HourMinuteSecond turnOnTime;
@@ -56,7 +61,7 @@ void setup() {
 
 	pinMode (lightPin, OUTPUT);
 	pinMode (statLedPin, OUTPUT);
-	
+
 	digitalWrite (lightPin, EEPROM.read (EE_light_addigitalRead) );
 }
 
@@ -68,7 +73,7 @@ void loop() {
 		int i = 0;
 
 		for (i=0; i<64; i++) {
-			input[i] = Serial.read();	
+			input[i] = Serial.read();
 
 			if (input[i] == '\n') {
 				input[i] = 0; // add terminator
@@ -101,7 +106,7 @@ void loop() {
 		// double indented case
 		bool outcome = false;
 		switch (command->commandIndex) {
-			case 0:
+			case 0: // light set dd/mm/yy hh:mm:ss
 					outcome = timeSet (command->paramList, command->paramNumber);
 
 					if (!outcome) {
@@ -112,7 +117,7 @@ void loop() {
 
 					freeCommand (command);
 					break;
-			case 1: 
+			case 1:
 					timeGet ();
 					break;
 			case 2:
@@ -134,13 +139,30 @@ void loop() {
 
 	rtcTime = rtc.getTime();
 
-	digitalWrite (statLedPin, timer.Clock());	
+	digitalWrite (statLedPin, timer.Clock());
 
 	// lights_Core (l_OnH,l_OnM,l_OffH,l_OffM);
 }
 
 bool timeSet (char **parameterList, int parameterNumber) {
-	return false;	
+	if (!parameterList || parameterNumber == 0) {
+		return false;
+	}
+
+	DayMonthYear inputDateNow;
+	HourMinuteSecond inputTimeNow;
+
+	inputDateNow.day = strToInt (parameterList[0]);
+	inputDateNow.month = strToInt (parameterList[1]);
+	inputDateNow.year = strToInt (parameterList[2]);
+
+	inputTimeNow.hour = strToInt (parameterList[3]);
+	inputTimeNow.minute = strToInt (parameterList[4]);
+	inputTimeNow.second = strToInt (parameterList[5]);
+
+	if (!isValidHourMinuteSecond (inputTimeNow) || !isValidDayMonthYear (inputDateNow)) {
+		return false;
+	}
 }
 
 void timeGet () {
@@ -196,7 +218,6 @@ bool lightSet (char ** parameterList, int parameterNumber) {
 }
 
 bool lightSet (HourMinuteSecond turnOnTime, HourMinuteSecond turnOffTime) {
-
 	if (isValidHourMinuteSecond (turnOnTime) && isValidHourMinuteSecond (turnOffTime)) {
 		lightSchedule.turnOnTime = turnOnTime;
 		lightSchedule.turnOffTime = turnOffTime;
@@ -218,7 +239,24 @@ bool strMatch (char *a, char *b) {
 	return false;
 }
 
-bool isValidHourMinuteSecond (HourMinuteSecond time) {	
+bool isValidDayMonthYear (DayMonthYear date) {
+	if (date.day <= 0 || date.day > 31) {
+		return false;
+	}
+
+	if (date.month <= 0 || date.month > 12) {
+		return false;
+	}
+
+	// if (date.year < 0 || date.year > 40) {
+	// 	// assuming year 2018 -> 18
+	// 	return false;
+	// }
+
+	return true;
+}
+
+bool isValidHourMinuteSecond (HourMinuteSecond time) {
 	if (time.hour < 0 || time.hour >= 24) {
 		return false;
 	}
@@ -249,7 +287,7 @@ uint8_t strToInt (char *s) {
 		res *= 10;
 		res += (*s) - '0';
 
-		s++;	
+		s++;
 	}
 
 	return res;
@@ -284,9 +322,9 @@ void lights_Core (int OnHour, int OnMinute, int OffHour, int OffMinute) {
      	digitalWrite (lightPin, 1);
      	EEPROM.write (EE_light_addigitalRead, 1);
 	}
-  
+
     if (rtcTime.min == OffMinute & rtcTime.hour == OffHour) {
-     	digitalWrite (lightPin, 0); 
+     	digitalWrite (lightPin, 0);
      	EEPROM.write (EE_light_addigitalRead, 0);
 	}
 }
@@ -325,7 +363,7 @@ bool commandTableINIT () {
 
 	if (!commandTable) {
 		return false;
-	} 
+	}
 
 	// allocate space for every string
 	for (int i=0; i<commandNumber; i++) {
@@ -466,7 +504,7 @@ Command * parse (char * userInput) {
 				for (size=0; parameter[size] != 0; size++) {}
 
 				// shift pointer forward
-				// magic number -1 accounts for the 'for' incrementation 
+				// magic number -1 accounts for the 'for' incrementation
 				// can't shift if the parameter length is zero, I would loop forever
 				if (size != 0) {
 					userCharPointer += size - 1;
@@ -480,7 +518,7 @@ Command * parse (char * userInput) {
 					if (!result->paramList) {
 						// bad allocation
 						for (int i=0; i<result->paramNumber; i++) {
-							free (result->paramList[i]);	
+							free (result->paramList[i]);
 						}
 
 						free (result->paramList);
@@ -497,7 +535,7 @@ Command * parse (char * userInput) {
 					// deallocate struct
 					if (!newParamList) {
 						for (int i=0; i<result->paramNumber; i++) {
-							free (result->paramList[i]);	
+							free (result->paramList[i]);
 						}
 
 						free (result->paramList);
@@ -519,14 +557,14 @@ Command * parse (char * userInput) {
 				// difference found
 				break;
 			}
-		}	
+		}
 	}
 
 
 
 	// free memory
 	for (int i=0; i<result->paramNumber; i++) {
-		free (result->paramList[i]);	
+		free (result->paramList[i]);
 	}
 
 	free (result->paramList);
