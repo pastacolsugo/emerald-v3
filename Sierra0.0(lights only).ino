@@ -48,12 +48,20 @@ Time rtcTime;
 
 LightProgram lightSchedule;
 
+char *input;
+uint8_t inputSize = 0;
+
 void setup() {
 	Serial.begin (9600); // 38400 ?
 	Serial.print ("boot...");
 	rtc.begin ();
 	timer.init (1000);
 	timer.ckSet (1000,20);
+
+    input = (char *) malloc (sizeof(char));
+    if (!input) {
+        Serial.println ("daffuk.");
+    }
 
 	commandTableINIT();
 
@@ -66,28 +74,19 @@ void setup() {
 }
 
 void loop() {
-	char input[64];
+    // if there is data available
+    if (Serial.available() > 0) {
+        // read one charachter
+        input[inputSize] = Serial.read();
+        inputSize++;
+    }
 
-	// read until newline
-	if (Serial.available() > 0) {
-		int i = 0;
+    // if the last char read is newline
+    if (input[inputSize-1] == '\n') {
+        // change it with terminator
+        input[inputSize-1] = 0;
 
-		for (i=0; i<64; i++) {
-			input[i] = Serial.read();
-
-			if (input[i] == '\n') {
-				input[i] = 0; // add terminator
-				break; // stop reading
-			}
-		}
-
-		if (input[i] != 0) {
-			// incorrect command reading
-			Serial.println ("Incorrect command reading.");
-			return;
-		}
-
-		Command *command = parse (input); // parse command string
+        Command *command = parse (input); // parse command string
 
 		if (!command) {
 			// wrong command
@@ -105,37 +104,47 @@ void loop() {
 		// linux kernel style switch
 		// double indented case
 		bool outcome = false;
+
 		switch (command->commandIndex) {
 			case 0: // light set dd/mm/yy hh:mm:ss
 					outcome = timeSet (command->paramList, command->paramNumber);
 
-					if (!outcome) {
-						Serial.println ("Fail.");
+					if (outcome) {
+                        Serial.println ("Success.");
 					} else {
-						Serial.println ("Success.");
+                        Serial.println ("Fail.");
 					}
 
-					freeCommand (command);
 					break;
 			case 1:
-					timeGet ();
+					timeGet();
 					break;
 			case 2:
 					outcome = lightSet (command->paramList, command->paramNumber);
 
-					if (!outcome) {
-						Serial.println ("Fail.");
+					if (outcome) {
+                        Serial.println ("Success.");
 					} else {
-						Serial.println ("Success.");
+                        Serial.println ("Fail.");
 					}
 
-					freeCommand (command);
 					break;
 			case 3:
 					lightGet();
 					break;
 		}
-	}
+
+        freeCommand(command);
+
+        inputSize = 0;
+        input[inputSize] = 0;
+    }
+
+    if (inputSize == 64) {
+        inputSize = 0;
+        input[inputSize] = 0;
+        Serial.println ("resetting input");
+    }
 
 	rtcTime = rtc.getTime();
 
@@ -163,6 +172,8 @@ bool timeSet (char **parameterList, int parameterNumber) {
 	if (!isValidHourMinuteSecond (inputTimeNow) || !isValidDayMonthYear (inputDateNow)) {
 		return false;
 	}
+
+    return true;
 }
 
 void timeGet () {
